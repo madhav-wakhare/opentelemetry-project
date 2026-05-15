@@ -1,108 +1,82 @@
-# CI for Product Catalog Service
-
 name: product-catalog-ci
-
-on: 
-    pull_request:
-        branches:
-        - main
-
+on:
+  pull_request:
+    branches: [main]
 jobs:
-    build:
-        runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        steps:
-        - name: checkout code
+      - name: setup go 1.22
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22
+
+      - name: Build
+        run: go build -o product-catalog-service src/product-catalog-service/main.
+        
+      - name: unit tests
+        run: go test ./src/product-catalog-service/...
+
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.56.2
+          golangci-lint run ./src/product-catalog-service/...
+
+  docker:
+      runs-on: ubuntu-latest
+      needs: build
+      steps:
+        - name: Checkout code
           uses: actions/checkout@v4
+      
+        - name: Install Docker Buildx
+          uses: docker/setup-buildx-action@v2
 
-        - name: Setup Go 1.22
-          uses: actions/setup-go@v2
-          with:
-            go-version: 1.22
-        
-        - name: Build
-          run: |
-            cd src/product-catalog
-            go mod download
-            go build -o product-catalog-service main.go
-
-        - name: unit tests
-          run: |
-            cd src/product-catalog
-            go test ./...
-    
-    code-quality:
-        runs-on: ubuntu-latest
-
-        steps:
-        - name: checkout code
-          uses: actions/checkout@v4
-        
-        - name: Setup Go 1.22
-          uses: actions/setup-go@v2
-          with:
-           go-version: 1.22
-        
-        - name: Run golangci-lint
-          uses: golangci/golangci-lint-action@v6
-          with:
-            version: v1.55.2
-            run: golangci-lint run
-            working-directory: src/product-catalog
-
-    docker:
-        runs-on: ubuntu-latest
-
-        needs: build
-
-        steps:
-        - name: checkout code
-          uses: actions/checkout@v4
-
-        - name: Install Docker
-          uses: docker/setup-buildx-action@v1
-        
-        - name: Login to Docker
-          uses: docker/login-action@v3
+        - name: Login to DockerHub
+          uses: docker/login-action@v2
           with:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_TOKEN }}
-
-        - name: Docker Push
-          uses: docker/build-push-action@v6
+        
+        - name: Push to DockerHub
+          uses: docker/build-push-action@v3
           with:
-            context: src/product-catalog
-            file: src/product-catalog/Dockerfile
+            context: .
+            file: ./src/product-catalog-service/Dockerfile
             push: true
-            tags: ${{ secrets.DOCKER_USERNAME }}/product-catalog:${{github.run_id}}
-
-    
-    updatek8s:
-        runs-on: ubuntu-latest
-
-        needs: docker
-
-        steps:
-        - name: checkout code
+            tags: ${{ secrets.DOCKER_USERNAME }}/product-catalog-service:${{ github.run_id }}
+        
+  Update-k8s-deployment-manifest:
+      runs-on: ubuntu-latest
+      needs: docker
+      steps:
+        - name: Checkout code
           uses: actions/checkout@v4
           with:
-            token: ${{ secrets.GITHUB_TOKEN }}
+            token: ${{ secrets.GH_TOKEN }} # Need write access to update the manifest file
 
-        - name: Update tag in kubernetes deployment manifest
-          run: | 
-               sed -i "s|image: .*|image: ${{ secrets.DOCKER_USERNAME }}/product-catalog:${{github.run_id}}|" kubernetes/productcatalog/deploy.yaml
+        - name: Update k8s deployment manifest
+          run: |
+            sed -i 's/image: .*/image: ${{ secrets.DOCKER_USERNAME }}/product-catalog-service:${{ github.run_id }}/' ./kubernetes/product-catalog/deploy.yaml
+            
+            # sed command explanation:
+            # -i: edit the file in place
+            # 's/image: .*/image: <new_image>/' : search for lines that start with "image: " and replace the entire line with the new image name
+            # The .* matches any characters that come after "image: " and replaces it with the new image name
         
         - name: Commit and push changes
           run: |
-            git config --global user.email "abhishek@gmail.com"
-            git config --global user.name "Abhishek Veeramalla"
-            git add kubernetes/productcatalog/deploy.yaml
-            git commit -m "[CI]: Update product catalog image tag"
-            git push origin HEAD:main -f
-
-        
-        
-          
-
-
-        
+            git config --global user.name "Madhav Wakhare"
+            git config --global user.email "wakharemadhav@gmail.com"
+            git add ./kubernetes/product-catalog/deploy.yaml
+            git commit -m "[CI]: Update product-catalog deployment image to ${{ secrets.DOCKER_USERNAME }}/product-catalog-service:${{ github.run_id }}"
+            git push origin main
