@@ -15,10 +15,10 @@ jobs:
           go-version: 1.22
 
       - name: Build
-        run: go build -o product-catalog-service src/product-catalog-service/main.
+        run: go build -o product-catalog-service src/product-catalog-service/main
         
       - name: unit tests
-        run: go test ./src/product-catalog-service/...
+        run: go test ../../src/product-catalog/...
 
   code-quality:
     runs-on: ubuntu-latest
@@ -29,7 +29,7 @@ jobs:
       - name: Run golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.56.2
-          golangci-lint run ./src/product-catalog-service/...
+          golangci-lint run ../../src/product-catalog/...
 
   docker:
       runs-on: ubuntu-latest
