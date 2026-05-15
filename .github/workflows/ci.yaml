@@ -1,6 +1,6 @@
 name: product-catalog-ci
 on:
-  pull_request:
+  push:
     branches: [main]
 jobs:
   build:
