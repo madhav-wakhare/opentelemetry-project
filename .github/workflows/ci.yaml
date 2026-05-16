@@ -84,6 +84,6 @@ jobs:
         run: |
           git config --global user.name "Madhav Wakhare"
           git config --global user.email "wakharemadhav@gmail.com"
-          ggit add ./kubernetes/productcatalog/deploy.yaml
+          git add ./kubernetes/productcatalog/deploy.yaml
           git commit -m "[CI]: Update product-catalog deployment image to ${{ secrets.DOCKER_USERNAME }}/product-catalog:${{ github.run_id }}"
           git push origin main
