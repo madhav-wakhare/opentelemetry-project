@@ -75,7 +75,7 @@ jobs:
 
       - name: Update k8s deployment manifest
         run: |
-          sed -i "s|image: .*|image: ${{ secrets.DOCKER_USERNAME }}/product-catalog:${{ github.run_id }}|" ./kubernetes/product-catalog/deploy.yaml
+          sed -i "s|image: .*|image: ${{ secrets.DOCKER_USERNAME }}/product-catalog:${{ github.run_id }}|" ./kubernetes/productcatalog/deploy.yaml
           # sed command explanation:
           # -i: edit the file in place
           # "s|image: .*|image: ${{ secrets.DOCKER_USERNAME }}/product-catalog:${{ github.run_id }}|": this is the substitution command that replaces the line starting with "image: " with the new image name and tag
